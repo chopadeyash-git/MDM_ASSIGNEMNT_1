@@ -1,0 +1,3 @@
+db_name: bookbazaar_db
+db_user: bookuser
+db_password: "ChangeMe@123"

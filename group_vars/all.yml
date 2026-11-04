@@ -1,0 +1,7 @@
+app_name: BookBazaar
+app_env: development
+common_packages:
+  - git
+  - curl
+  - vim
+  - htop

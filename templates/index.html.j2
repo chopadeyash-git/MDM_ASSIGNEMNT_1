@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<head><title>{{ app_name }}</title></head>
+<body style="font-family:Arial;text-align:center;margin-top:60px">
+  <h1>Welcome to {{ app_name }}</h1>
+  <p>Your online bookstore, deployed by Ansible</p>
+  <p>Environment: <b>{{ app_env }}</b></p>
+  <p>Served by host: <b>{{ inventory_hostname }}</b></p>
+  <p>OS: {{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}</p>
+</body>
+</html>

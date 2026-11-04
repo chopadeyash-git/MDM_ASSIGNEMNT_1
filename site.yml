@@ -1,0 +1,121 @@
+---
+- name: Common configuration for all BookBazaar servers
+  hosts: bookbazaar
+  become: true
+  tags: common
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install common packages
+      ansible.builtin.apt:
+        name: "{{ common_packages }}"
+        state: present
+
+    - name: Set timezone to Asia/Kolkata
+      community.general.timezone:
+        name: Asia/Kolkata
+
+- name: Configure web servers (Nginx)
+  hosts: webservers
+  become: true
+  tags: web
+  tasks:
+    - name: Install Nginx
+      ansible.builtin.apt:
+        name: nginx
+        state: present
+
+    - name: Create web root directory
+      ansible.builtin.file:
+        path: "{{ web_root }}"
+        state: directory
+        owner: www-data
+        group: www-data
+        mode: "0755"
+
+    - name: Deploy home page from template
+      ansible.builtin.template:
+        src: templates/index.html.j2
+        dest: "{{ web_root }}/index.html"
+        owner: www-data
+        group: www-data
+        mode: "0644"
+
+    - name: Deploy Nginx site configuration
+      ansible.builtin.template:
+        src: templates/nginx_site.conf.j2
+        dest: /etc/nginx/sites-available/bookbazaar
+        mode: "0644"
+      notify: Reload Nginx
+
+    - name: Enable BookBazaar site
+      ansible.builtin.file:
+        src: /etc/nginx/sites-available/bookbazaar
+        dest: /etc/nginx/sites-enabled/bookbazaar
+        state: link
+      notify: Reload Nginx
+
+    - name: Disable default Nginx site
+      ansible.builtin.file:
+        path: /etc/nginx/sites-enabled/default
+        state: absent
+      notify: Reload Nginx
+
+    - name: Ensure Nginx is started and enabled at boot
+      ansible.builtin.service:
+        name: nginx
+        state: started
+        enabled: true
+
+    - name: Verify website responds with HTTP 200
+      ansible.builtin.uri:
+        url: "http://localhost:{{ nginx_port }}"
+        status_code: 200
+      register: web_check
+
+    - name: Show verification result
+      ansible.builtin.debug:
+        msg: "{{ app_name }} is live on {{ inventory_hostname }} (HTTP {{ web_check.status }})"
+
+  handlers:
+    - name: Reload Nginx
+      ansible.builtin.service:
+        name: nginx
+        state: reloaded
+
+- name: Configure database server (MariaDB)
+  hosts: dbservers
+  become: true
+  tags: db
+  tasks:
+    - name: Install MariaDB server and Python MySQL driver
+      ansible.builtin.apt:
+        name:
+          - mariadb-server
+          - python3-pymysql
+        state: present
+
+    - name: Ensure MariaDB is started and enabled at boot
+      ansible.builtin.service:
+        name: mariadb
+        state: started
+        enabled: true
+
+    - name: Create application database
+      community.mysql.mysql_db:
+        name: "{{ db_name }}"
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+
+    - name: Create application database user
+      community.mysql.mysql_user:
+        name: "{{ db_user }}"
+        password: "{{ db_password }}"
+        priv: "{{ db_name }}.*:ALL"
+        host: "%"
+        state: present
+        login_unix_socket: /run/mysqld/mysqld.sock
+      no_log: true
